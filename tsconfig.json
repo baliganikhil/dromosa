@@ -1,11 +1,11 @@
 {
-  "compileOnSave": false,
+  "compileOnSave": true,
   "compilerOptions": {
     "baseUrl": "./ts",
     "outDir": "./js/",
     "sourceMap": true,
     "declaration": false,
-    "module": "es6",
+    "module": "commonjs",
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -16,7 +16,8 @@
     ],
     "lib": [
       "es2018",
-      "dom"
+      "dom",
+      "es5"
     ]
   }
 }

@@ -1,4 +1,6 @@
-export class Hero {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+class Hero {
     constructor(x, y) {
         this.setXY = (x, y) => {
             this.x = x;
@@ -13,4 +15,5 @@ export class Hero {
         this.setXY(x, y);
     }
 }
+exports.Hero = Hero;
 //# sourceMappingURL=hero.js.map

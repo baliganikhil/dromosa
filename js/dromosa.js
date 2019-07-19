@@ -439,8 +439,7 @@ var BoardTiles;
 })(BoardTiles || (BoardTiles = {}));
 $('.start-game').on('click', () => {
     const game = new Game();
-    // const direction = game.changeCompassDirection();
     game.init();
-    // console.log(direction);
 });
+$('.start-game').click();
 //# sourceMappingURL=dromosa.js.map

@@ -39,12 +39,31 @@ class Game {
     constructor() {
         this.BOARD_SIZE = 10;
         this.board = [];
+        this.gameSpeed = 500;
+        this.gameRunning = false;
         this.init = () => {
+            this.gameRunning = true;
             this.changeCompassDirection(CompassDirection.NORTH);
             this.createNewMap();
             this.createMaze();
             this.drawMap();
             this.initKeyboard();
+            this.initDifficulty();
+            this.startMovingVillain();
+        };
+        this.initDifficulty = () => {
+            let difficulty = $('#difficulty').val();
+            switch (difficulty) {
+                case 'easy':
+                    this.gameSpeed = 1000;
+                    break;
+                case 'medium':
+                    this.gameSpeed = 700;
+                    break;
+                case 'hard':
+                    this.gameSpeed = 400;
+                    break;
+            }
         };
         this.createNewMap = () => {
             for (let i = 0; i <= this.BOARD_SIZE; i++) {
@@ -107,7 +126,6 @@ class Game {
                 let direction = n.getDirection();
                 n.setDirection(getDirection());
                 stack.push(n);
-                console.log(i, j, direction, goalX, goalY);
                 if (i === goalX && j === goalY) {
                     break;
                 }
@@ -140,7 +158,6 @@ class Game {
                 n = stack[i];
                 this.board[n.getX()][n.getY()] = BoardTiles.GRASS;
             }
-            this.solution = stack;
             this.board[this.hero.getStartX()][this.hero.getStartY()] = BoardTiles.HERO;
             this.board[goalX][goalY] = BoardTiles.GOAL;
             this.board[5][5] = BoardTiles.COMPASS_SHIFTER;
@@ -173,6 +190,8 @@ class Game {
             document.addEventListener('keydown', (e) => {
                 const origHeroX = this.hero.getX(), origHeroY = this.hero.getY();
                 let newHeroX, newHeroY;
+                if (!this.gameRunning)
+                    return;
                 switch (e.code) {
                     case "ArrowLeft": {
                         switch (this.compassDirection) {
@@ -259,31 +278,33 @@ class Game {
                         break;
                     }
                 }
-                this.handleHeroMove(origHeroX, origHeroY, newHeroX, newHeroY);
+                this.handleHeroMove(origHeroX, origHeroY, newHeroX, newHeroY, BoardTiles.HERO);
             });
-            console.log('keyboard ready');
         };
-        this.handleHeroMove = (origHeroX, origHeroY, newHeroX, newHeroY) => {
-            if (newHeroY === 0) {
+        this.handleHeroMove = (origX, origY, newX, newY, character) => {
+            if (newY === 0) {
                 return;
             }
-            if (this.checkIfGoalReached(newHeroX, newHeroY))
+            if (this.checkIfGoalReached(newX, newY, character))
                 return;
-            switch (this.board[origHeroX][origHeroY]) {
+            switch (this.board[origX][origY]) {
                 case BoardTiles.HERO_COMPASS_SHIFTER:
-                    this.board[origHeroX][origHeroY] = BoardTiles.COMPASS_SHIFTER;
+                    this.board[origX][origY] = BoardTiles.COMPASS_SHIFTER;
                     break;
                 default:
-                    this.board[origHeroX][origHeroY] = BoardTiles.GRASS;
+                    this.board[origX][origY] = BoardTiles.GRASS;
                     break;
             }
-            switch (this.board[newHeroX][newHeroY]) {
+            if (this.hero.getX() === this.villain.getX() && this.hero.getY() === this.villain.getY() && character === BoardTiles.HERO) {
+                this.board[origX][origY] = BoardTiles.HERO;
+            }
+            switch (this.board[newX][newY]) {
                 case BoardTiles.COMPASS_SHIFTER:
-                    this.board[newHeroX][newHeroY] = BoardTiles.HERO_COMPASS_SHIFTER;
+                    this.board[newX][newY] = BoardTiles.HERO_COMPASS_SHIFTER;
                     this.changeCompassDirection();
                     break;
                 case BoardTiles.GRASS:
-                    this.board[newHeroX][newHeroY] = BoardTiles.HERO;
+                    this.board[newX][newY] = character;
                     break;
                 case BoardTiles.WALL:
                     return;
@@ -291,7 +312,9 @@ class Game {
                     this.resetHero();
                     return;
             }
-            this.hero.setXY(newHeroX, newHeroY);
+            if (character === BoardTiles.HERO) {
+                this.hero.setXY(newX, newY);
+            }
             this.drawMap();
         };
         this.changeCompassDirection = (direction) => {
@@ -305,15 +328,22 @@ class Game {
             $('.compass-direction').text(CompassDirection[this.compassDirection]);
             return this.compassDirection;
         };
-        this.checkIfGoalReached = (x, y) => {
+        this.checkIfGoalReached = (x, y, character) => {
             if (this.board[x][y] === BoardTiles.GOAL) {
-                this.declareWinner();
+                this.declareWinner(character);
                 return true;
             }
             return false;
         };
-        this.declareWinner = () => {
-            alert('You Win');
+        this.declareWinner = (character) => {
+            if (character === BoardTiles.HERO) {
+                alert('You Win');
+            }
+            else {
+                alert('You Lose!');
+            }
+            clearInterval(this.villainIntervalhandle);
+            this.gameRunning = false;
         };
         this.resetHero = () => {
             this.hero.setXY(this.hero.getStartX(), this.hero.getStartY());
@@ -321,7 +351,71 @@ class Game {
             this.drawMap();
         };
         this.startMovingVillain = () => {
-            console.log(this.solution);
+            const villainX = this.villain.getStartX(), villainY = this.villain.getStartY(), goalX = this.goal.getX(), goalY = this.goal.getY();
+            let i, j;
+            const stack = [];
+            let VISITED;
+            (function (VISITED) {
+                VISITED[VISITED["VISITED"] = 0] = "VISITED";
+                VISITED[VISITED["UNVISITED"] = 1] = "UNVISITED";
+            })(VISITED || (VISITED = {}));
+            const visitedMatrix = [];
+            for (let i = 0; i < this.BOARD_SIZE; i++) {
+                let row = [];
+                for (let j = 0; j < this.BOARD_SIZE; j++) {
+                    row.push(VISITED.UNVISITED);
+                }
+                visitedMatrix.push(row);
+            }
+            let n = new SolutionNode(villainX, villainY);
+            visitedMatrix[villainX][villainY] = VISITED.VISITED;
+            stack.push(n);
+            while (stack.length !== 0) {
+                n = stack.pop();
+                i = n.getX();
+                j = n.getY();
+                let direction = n.getDirection();
+                n.setDirection(direction + 1);
+                stack.push(n);
+                if (i === goalX && j === goalY) {
+                    break;
+                }
+                if (direction === 2 && (i - 1) > 0 && visitedMatrix[i - 1][j] === VISITED.UNVISITED && this.board[i - 1][j] !== BoardTiles.FIRE) {
+                    visitedMatrix[i - 1][j] = VISITED.VISITED;
+                    let newNode = new SolutionNode(i - 1, j);
+                    stack.push(newNode);
+                }
+                else if (direction === 1 && (j + 1) < this.BOARD_SIZE && visitedMatrix[i][j + 1] === VISITED.UNVISITED && this.board[i][j + 1] !== BoardTiles.FIRE) {
+                    visitedMatrix[i][j + 1] = VISITED.VISITED;
+                    let newNode = new SolutionNode(i, j + 1);
+                    stack.push(newNode);
+                }
+                else if (direction === 0 && (i + 1) < this.BOARD_SIZE && visitedMatrix[i + 1][j] === VISITED.UNVISITED && this.board[i + 1][j] !== BoardTiles.FIRE) {
+                    visitedMatrix[i + 1][j] = VISITED.VISITED;
+                    let newNode = new SolutionNode(i + 1, j);
+                    stack.push(newNode);
+                }
+                else if (direction === 3 && (j - 1) > 0 && visitedMatrix[i][j - 1] === VISITED.UNVISITED && this.board[i][j - 1] !== BoardTiles.FIRE) {
+                    visitedMatrix[i][j - 1] = VISITED.VISITED;
+                    let newNode = new SolutionNode(i, j - 1);
+                    stack.push(newNode);
+                }
+                else if (direction === 4) {
+                    visitedMatrix[i][j] = VISITED.UNVISITED;
+                    stack.pop();
+                }
+            }
+            this.villainIntervalhandle = setInterval(() => {
+                if (stack.length === 0) {
+                    clearInterval(this.villainIntervalhandle);
+                    return;
+                }
+                let n = stack.shift();
+                let newVillainX = n.getX();
+                let newVillainY = n.getY();
+                this.handleHeroMove(this.villain.getX(), this.villain.getY(), newVillainX, newVillainY, BoardTiles.VILLAIN);
+                this.villain.setXY(newVillainX, newVillainY);
+            }, this.gameSpeed);
         };
     }
 }
@@ -343,9 +437,10 @@ var BoardTiles;
     BoardTiles[BoardTiles["GOAL"] = 6] = "GOAL";
     BoardTiles[BoardTiles["VILLAIN"] = 7] = "VILLAIN";
 })(BoardTiles || (BoardTiles = {}));
-const game = new Game();
-// const direction = game.changeCompassDirection();
-game.init();
-// console.log(direction);
-game.startMovingVillain();
+$('.start-game').on('click', () => {
+    const game = new Game();
+    // const direction = game.changeCompassDirection();
+    game.init();
+    // console.log(direction);
+});
 //# sourceMappingURL=dromosa.js.map
